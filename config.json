@@ -1,0 +1,14 @@
+{
+    "sscNodes": [
+        "https://testapi.steem-engine.com"
+    ],
+    "chainId": "ssc-0000000000000000001T",
+    "account": "steemsc",
+    "steemNodes": [
+        "https://api.steemit.com",
+        "https://rpc.buildteam.io",
+        "https://steemd.minnowsupportproject.org",
+        "https://steemd.privex.io",
+        "https://gtg.steem.house:8090"
+    ]
+}
