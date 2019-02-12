@@ -25,7 +25,7 @@ const getSSCNode = () => {
   const node = sscNodes.pop();
   sscNodes.push(node);
 
-  console.log('Using Steem node:', node); // eslint-disable-line no-console
+  console.log('Using SSC node:', node); // eslint-disable-line no-console
   return node;
 };
 

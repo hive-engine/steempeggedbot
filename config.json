@@ -1,9 +1,9 @@
 {
     "sscNodes": [
-        "https://testapi.steem-engine.com"
+        "https://api.steem-engine.com/rpc/"
     ],
-    "chainId": "ssc-0000000000000000001T",
-    "account": "steemsc",
+    "chainId": "ssc-mainnet1",
+    "account": "steem-peg",
     "steemNodes": [
         "https://api.steemit.com",
         "https://rpc.buildteam.io",
