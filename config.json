@@ -4,6 +4,7 @@
     ],
     "chainId": "ssc-mainnet1",
     "account": "steem-peg",
+    "bigWithdrawalsAmount": "2000",
     "steemNodes": [
         "https://api.steemit.com",
         "https://rpc.buildteam.io",

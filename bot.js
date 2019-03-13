@@ -6,7 +6,7 @@ const { Queue } = require('./libs/Queue');
 const config = require('./config');
 
 
-const { account } = config;
+const { account, bigWithdrawalsAmount } = config;
 const activeKey = dsteem.PrivateKey.from(process.env.ACTIVE_KEY);
 const steemNodes = new Queue();
 const sscNodes = new Queue();
@@ -30,6 +30,7 @@ const getSSCNode = () => {
 };
 
 let pendingWithdrawals = [];
+const bigPendingWithdrawalsIDs = new Queue(1000);
 const maxNumberPendingWithdrawals = 10;
 const timeout = 3000;
 const contractName = 'steempegged';
@@ -93,15 +94,66 @@ const processPendingWithdrawals = async () => {
   checkWithdrawalsStatus(); // eslint-disable-line no-use-before-define
 };
 
+// send a notification to the account that requested the withdrawal
+const processBigPendingWithdrawals = async (transactions) => {
+  const ops = [];
+  const newTxIDs = [];
+  transactions.forEach((tx) => {
+    const {
+      id,
+      recipient,
+    } = tx;
+
+    if (!bigPendingWithdrawalsIDs.includes(id)) {
+      const memo = `Large withdrawals need to go through a manual review process for security purposes. Please contact us on the Steem Engine Discord (https://discord.gg/GgqYDb7) for questions or concerns. (tx: ${id})`;
+      ops.push(buildTransferOp(recipient, '0.001 STEEM', memo));
+      newTxIDs.push(id);
+    }
+  });
+
+  try {
+    if (ops.length > 0) {
+      console.log('sending out notification:', ops); // eslint-disable-line no-console
+      await steem.broadcast.sendOperations(ops, activeKey);
+      newTxIDs.forEach((newTx) => {
+        bigPendingWithdrawalsIDs.push(newTx);
+      });
+    }
+  } catch (error) {
+    console.error(error); // eslint-disable-line no-console
+    steem = new dsteem.Client(getSteemNode());
+    await processBigPendingWithdrawals(transactions); // try to transfer again
+  }
+};
+
 // get the pending withdrawals from the 'withdrawals' table of the smart contract
 const getPendingWithdrawals = async () => {
   pendingWithdrawals = [];
-  pendingWithdrawals = await ssc.find(contractName, tableName, {}, maxNumberPendingWithdrawals);
+  pendingWithdrawals = await ssc.find(contractName, tableName, {
+    quantity: {
+      $lt: bigWithdrawalsAmount,
+    },
+  }, maxNumberPendingWithdrawals);
 
   if (pendingWithdrawals.length <= 0) {
     setTimeout(() => getPendingWithdrawals(), timeout);
   } else {
     processPendingWithdrawals();
+  }
+};
+
+const getBigPendingWithdrawals = async () => {
+  let bigPendingWithdrawals = [];
+  bigPendingWithdrawals = await ssc.find(contractName, tableName, {
+    quantity: {
+      $gte: bigWithdrawalsAmount,
+    },
+  });
+
+  if (bigPendingWithdrawals.length <= 0) {
+    setTimeout(() => getBigPendingWithdrawals(), timeout);
+  } else {
+    processBigPendingWithdrawals(bigPendingWithdrawals);
   }
 };
 
@@ -125,6 +177,9 @@ const checkWithdrawalsStatus = async () => {
 
 // start polling the pending withdrawals
 getPendingWithdrawals();
+
+// start polling the BIG pending withdrawals
+getBigPendingWithdrawals();
 
 // graceful app closing
 nodeCleanup((exitCode, signal) => { // eslint-disable-line no-unused-vars
