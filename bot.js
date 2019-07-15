@@ -31,14 +31,15 @@ const getSSCNode = () => {
 
 let pendingWithdrawals = [];
 const bigPendingWithdrawalsIDs = new Queue(1000);
-const maxNumberPendingWithdrawals = 10;
-const timeout = 3000;
+const maxNumberPendingWithdrawals = 1;
+const timeout = 6000;
+const queryTimeout = 60000;
 const contractName = 'steempegged';
 const contractAction = 'removeWithdrawal';
 const tableName = 'withdrawals';
 
-let steem = new dsteem.Client(getSteemNode());
-let ssc = new SSC(getSSCNode());
+let steem = new dsteem.Client(getSteemNode(), { timeout: queryTimeout });
+let ssc = new SSC(getSSCNode(), queryTimeout);
 
 const buildTransferOp = (to, amount, memo) => ['transfer',
   {
@@ -75,14 +76,14 @@ const buildTranferTx = (tx) => {
 const transferAssets = async () => {
   const ops = pendingWithdrawals.map(el => buildTranferTx(el));
 
-  try {
-    console.log('sending out:', ops); // eslint-disable-line no-console
-    await steem.broadcast.sendOperations(ops, activeKey);
-  } catch (error) {
+  // try {
+  console.log('sending out:', ops); // eslint-disable-line no-console
+  await steem.broadcast.sendOperations(ops, activeKey);
+  /* } catch (error) {
     console.error(error); // eslint-disable-line no-console
-    steem = new dsteem.Client(getSteemNode());
+    steem = new dsteem.Client(getSteemNode(), { timeout: queryTimeout });
     await transferAssets(); // try to transfer again
-  }
+  } */
 };
 
 // transfer the pending withdrawals according to what we retrieved from the smart contract
@@ -121,7 +122,7 @@ const processBigPendingWithdrawals = async (transactions) => {
     }
   } catch (error) {
     console.error(error); // eslint-disable-line no-console
-    steem = new dsteem.Client(getSteemNode());
+    steem = new dsteem.Client(getSteemNode(), { timeout: queryTimeout });
     await processBigPendingWithdrawals(transactions); // try to transfer again
   }
 };
@@ -171,7 +172,7 @@ const checkWithdrawalsStatus = async () => {
     }
   } catch (error) {
     console.log(error);
-    ssc = new SSC(getSSCNode());
+    ssc = new SSC(getSSCNode(), queryTimeout);
   }
 };
 
@@ -179,7 +180,7 @@ const checkWithdrawalsStatus = async () => {
 getPendingWithdrawals();
 
 // start polling the BIG pending withdrawals
-getBigPendingWithdrawals();
+// getBigPendingWithdrawals();
 
 // graceful app closing
 nodeCleanup((exitCode, signal) => { // eslint-disable-line no-unused-vars
