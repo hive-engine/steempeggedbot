@@ -130,31 +130,43 @@ const processBigPendingWithdrawals = async (transactions) => {
 // get the pending withdrawals from the 'withdrawals' table of the smart contract
 const getPendingWithdrawals = async () => {
   pendingWithdrawals = [];
-  pendingWithdrawals = await ssc.find(contractName, tableName, {
-    quantity: {
-      $lt: bigWithdrawalsAmount,
-    },
-  }, maxNumberPendingWithdrawals);
+  try {
+    pendingWithdrawals = await ssc.find(contractName, tableName, {
+      quantity: {
+        $lt: bigWithdrawalsAmount,
+      },
+    }, maxNumberPendingWithdrawals);
 
-  if (pendingWithdrawals.length <= 0) {
+    if (pendingWithdrawals.length <= 0) {
+      setTimeout(() => getPendingWithdrawals(), timeout);
+    } else {
+      processPendingWithdrawals();
+    }
+  } catch (error) {
+    console.log(error);
+    ssc = new SSC(getSSCNode(), queryTimeout);
     setTimeout(() => getPendingWithdrawals(), timeout);
-  } else {
-    processPendingWithdrawals();
   }
 };
 
 const getBigPendingWithdrawals = async () => {
   let bigPendingWithdrawals = [];
-  bigPendingWithdrawals = await ssc.find(contractName, tableName, {
-    quantity: {
-      $gte: bigWithdrawalsAmount,
-    },
-  });
+  try {
+    bigPendingWithdrawals = await ssc.find(contractName, tableName, {
+      quantity: {
+        $gte: bigWithdrawalsAmount,
+      },
+    });
 
-  if (bigPendingWithdrawals.length <= 0) {
+    if (bigPendingWithdrawals.length <= 0) {
+      setTimeout(() => getBigPendingWithdrawals(), timeout);
+    } else {
+      processBigPendingWithdrawals(bigPendingWithdrawals);
+    }
+  } catch (error) {
+    console.log(error);
+    ssc = new SSC(getSSCNode(), queryTimeout);
     setTimeout(() => getBigPendingWithdrawals(), timeout);
-  } else {
-    processBigPendingWithdrawals(bigPendingWithdrawals);
   }
 };
 
@@ -173,6 +185,7 @@ const checkWithdrawalsStatus = async () => {
   } catch (error) {
     console.log(error);
     ssc = new SSC(getSSCNode(), queryTimeout);
+    setTimeout(() => checkWithdrawalsStatus(), timeout);
   }
 };
 
