@@ -31,7 +31,7 @@ const getSSCNode = () => {
 
 let pendingWithdrawals = [];
 const bigPendingWithdrawalsIDs = new Queue(1000);
-const maxNumberPendingWithdrawals = 1;
+const maxNumberPendingWithdrawals = 10;
 const timeout = 6000;
 const queryTimeout = 60000;
 const contractName = 'steempegged';
@@ -131,11 +131,14 @@ const processBigPendingWithdrawals = async (transactions) => {
 const getPendingWithdrawals = async () => {
   pendingWithdrawals = [];
   try {
-    pendingWithdrawals = await ssc.find(contractName, tableName, {
-      quantity: {
-        $lt: bigWithdrawalsAmount,
-      },
-    }, maxNumberPendingWithdrawals);
+    const res = await ssc.find(contractName, tableName, { }, maxNumberPendingWithdrawals);
+    for (let index = 0; index < res.length; index += 1) {
+      const element = res[index];
+      if (parseFloat(element.quantity) < 2000) {
+        pendingWithdrawals.push(element);
+        break;
+      }
+    }
 
     if (pendingWithdrawals.length <= 0) {
       setTimeout(() => getPendingWithdrawals(), timeout);
