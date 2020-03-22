@@ -75,6 +75,7 @@ const start = async () => {
       } else {
         console.log('skipping', recipient, airdrop[1]);
         fs.appendFileSync('./airdrop.log', `skipped ${recipient} ${airdrop[1]}\n`);
+        lr.resume()
       }
     }
   });
