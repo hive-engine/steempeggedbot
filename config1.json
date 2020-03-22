@@ -1,0 +1,9 @@
+{
+    "account": "steem-peg",
+    "steemNodes": [
+        "https://api.hive.blog",
+        "https://api.openhive.network",
+        "https://anyx.io",
+        "https://api.hivekings.com"
+    ]
+}

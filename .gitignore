@@ -5,5 +5,5 @@ data
 test/data
 *.key
 *.cert
-blocks.log
+*.log
 .env
