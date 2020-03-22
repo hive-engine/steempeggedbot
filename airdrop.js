@@ -69,8 +69,8 @@ const start = async () => {
 
       if (parseFloat(quantity) >= 0.001) {
         transferAssets(recipient, quantity, 'HIVE', () => {
-          //setTimeout(() => lr.resume(), 1000);
-          lr.resume()
+          setTimeout(() => lr.resume(), 1000);
+          //lr.resume()
         });
       } else {
         console.log('skipping', recipient, airdrop[1]);
