@@ -62,11 +62,11 @@ const start = async () => {
   lr.on('line', async (line) => {
     lr.pause();
     if (line !== '') {
+      console.log(line);
       const airdrop = line.split(' ');
       const recipient = airdrop[0];
       let quantity = airdrop[1].split('.');
       quantity = `${quantity[0]}.${quantity[1].substring(0, 3)}`;
-
       if (parseFloat(quantity) >= 0.001) {
         transferAssets(recipient, quantity, 'HIVE', () => {
           setTimeout(() => lr.resume(), 3000);
