@@ -1,7 +1,7 @@
 require('dotenv').config();
 const nodeCleanup = require('node-cleanup');
 const SSC = require('sscjs');
-const dsteem = require('dsteem');
+const dsteem = require('@hivechain/dsteem');
 const { Queue } = require('./libs/Queue');
 const config = require('./config');
 
@@ -17,7 +17,7 @@ const getSteemNode = () => {
   const node = steemNodes.pop();
   steemNodes.push(node);
 
-  console.log('Using Steem node:', node); // eslint-disable-line no-console
+  console.log('Using HIVE node:', node); // eslint-disable-line no-console
   return node;
 };
 
@@ -34,7 +34,7 @@ const bigPendingWithdrawalsIDs = new Queue(1000);
 const maxNumberPendingWithdrawals = 10;
 const timeout = 6000;
 const queryTimeout = 60000;
-const contractName = 'steempegged';
+const contractName = 'hivepegged';
 const contractAction = 'removeWithdrawal';
 const tableName = 'withdrawals';
 
@@ -134,7 +134,7 @@ const getPendingWithdrawals = async () => {
     const res = await ssc.find(contractName, tableName, { }, maxNumberPendingWithdrawals);
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
-      if (parseFloat(element.quantity) < 2000) {
+      if (parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
         pendingWithdrawals.push(element);
         break;
       }

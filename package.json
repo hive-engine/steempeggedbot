@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@hivechain/dsteem": "^0.12.14",
     "dotenv": "^6.2.0",
     "fs-extra": "^7.0.1",
     "line-by-line": "^0.1.6",
