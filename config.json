@@ -4,11 +4,13 @@
     ],
     "chainId": "ssc-mainnet-hive",
     "account": "honey-swap",
-    "bigWithdrawalsAmount": "20000",
+    "bigWithdrawalsAmount": "100000",
     "steemNodes": [
-        "https://api.openhive.network",
         "https://api.hive.blog",
+        "https://hived.privex.io",
+        "https://hived.hive-engine.com",
         "https://anyx.io",
+        "https://api.openhive.network",
         "https://api.hivekings.com"
     ]
 }
