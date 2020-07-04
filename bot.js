@@ -134,7 +134,7 @@ const getPendingWithdrawals = async () => {
     const res = await ssc.find(contractName, tableName, { }, maxNumberPendingWithdrawals);
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
-      if (parseFloat(element.quantity) < 2000) {
+      if (parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
         pendingWithdrawals.push(element);
         break;
       }

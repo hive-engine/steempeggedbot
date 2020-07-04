@@ -4,12 +4,9 @@
     ],
     "chainId": "ssc-mainnet1",
     "account": "steem-peg",
-    "bigWithdrawalsAmount": "2000",
+    "bigWithdrawalsAmount": "100000",
     "steemNodes": [
         "https://api.steemit.com",
-        "https://rpc.buildteam.io",
-        "https://steemd.minnowsupportproject.org",
-        "https://steemd.privex.io",
-        "https://gtg.steem.house:8090"
+        "https://steemd.privex.io"
     ]
 }
