@@ -1,13 +1,13 @@
 require('dotenv').config();
 const nodeCleanup = require('node-cleanup');
 const SSC = require('sscjs');
-const dsteem = require('@hivechain/dsteem');
+const dhive = require('@hiveio/dhive');
 const { Queue } = require('./libs/Queue');
 const config = require('./config');
 
 
 const { account, bigWithdrawalsAmount } = config;
-const activeKey = dsteem.PrivateKey.from(process.env.ACTIVE_KEY);
+const activeKey = dhive.PrivateKey.from(process.env.ACTIVE_KEY);
 const steemNodes = new Queue();
 const sscNodes = new Queue();
 config.steemNodes.forEach(node => steemNodes.push(node));
@@ -38,7 +38,7 @@ const contractName = 'hivepegged';
 const contractAction = 'removeWithdrawal';
 const tableName = 'withdrawals';
 
-let steem = new dsteem.Client(getSteemNode(), { timeout: queryTimeout });
+let hive = new dhive.Client(getSteemNode(), { timeout: queryTimeout });
 let ssc = new SSC(getSSCNode(), queryTimeout);
 
 const buildTransferOp = (to, amount, memo) => ['transfer',
@@ -78,10 +78,10 @@ const transferAssets = async () => {
 
   // try {
   console.log('sending out:', ops); // eslint-disable-line no-console
-  await steem.broadcast.sendOperations(ops, activeKey);
+  await hive.broadcast.sendOperations(ops, activeKey);
   /* } catch (error) {
     console.error(error); // eslint-disable-line no-console
-    steem = new dsteem.Client(getSteemNode(), { timeout: queryTimeout });
+    hive = new dhive.Client(getSteemNode(), { timeout: queryTimeout });
     await transferAssets(); // try to transfer again
   } */
 };
@@ -115,14 +115,14 @@ const processBigPendingWithdrawals = async (transactions) => {
   try {
     if (ops.length > 0) {
       console.log('sending out notification:', ops); // eslint-disable-line no-console
-      await steem.broadcast.sendOperations(ops, activeKey);
+      await hive.broadcast.sendOperations(ops, activeKey);
       newTxIDs.forEach((newTx) => {
         bigPendingWithdrawalsIDs.push(newTx);
       });
     }
   } catch (error) {
     console.error(error); // eslint-disable-line no-console
-    steem = new dsteem.Client(getSteemNode(), { timeout: queryTimeout });
+    hive = new dhive.Client(getSteemNode(), { timeout: queryTimeout });
     await processBigPendingWithdrawals(transactions); // try to transfer again
   }
 };
