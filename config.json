@@ -1,16 +1,23 @@
 {
     "sscNodes": [
-        "https://api.hive-engine.com/rpc/"
+        "https://api.hive-engine.com/rpc/",
+        "https://api2.hive-engine.com/rpc/",
+        "http://163.172.128.109:5000/",
+        "http://155.138.150.67:5000/",
+        "http://95.217.17.252:5000/",
+        "http://185.130.45.76:5000/",
+        "http://185.130.44.73:5000/",
+        "http://88.99.59.113:5000/"
     ],
     "chainId": "ssc-mainnet-hive",
     "account": "honey-swap",
     "bigWithdrawalsAmount": "100000",
+    "apiVerificationsNeeded": "3",
     "steemNodes": [
         "https://api.hive.blog",
         "https://hived.privex.io",
-        "https://hived.hive-engine.com",
         "https://anyx.io",
         "https://api.openhive.network",
-        "https://api.hivekings.com"
+        "https://api.deathwing.me"
     ]
 }
