@@ -7,7 +7,6 @@ const config = require('./config');
 
 
 const { account, bigWithdrawalsAmount } = config;
-const apiVerificationsNeeded = parseInt(config.apiVerificationsNeeded, 10);
 const activeKey = dhive.PrivateKey.from(process.env.ACTIVE_KEY);
 const steemNodes = new Queue();
 const sscNodes = new Queue();
@@ -73,21 +72,6 @@ const buildTranferTx = (tx) => {
   return buildTransferOp(recipient, `${quantity} ${type}`, JSON.stringify(memo));
 };
 
-const isTrxVerified = (txId) => {
-  const id = txId.split('-fee')[0];
-  console.log(`verifying: ${txId}`);
-
-  const txInfo = await ssc.getTransactionInfo(id);
-  if (txInfo) {
-    const blockNum = txInfo.blockNumber;
-    console.log(`${txId}: found in block ${blockNum}`);
-
-    // TODO: lookup block data here and confirm signed across multiple nodes
-  }
-
-  return false;
-};
-
 // transfer the Steem to the accounts according to the parameters we retrieved from the contract
 const transferAssets = async () => {
   const ops = pendingWithdrawals.map(el => buildTranferTx(el));
@@ -150,9 +134,8 @@ const getPendingWithdrawals = async () => {
     const res = await ssc.find(contractName, tableName, { }, maxNumberPendingWithdrawals);
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
-      if (isTrxVerified(element.id) && parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
-        // TODO: uncomment below line
-        //pendingWithdrawals.push(element);
+      if (parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
+        pendingWithdrawals.push(element);
         break;
       }
     }

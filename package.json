@@ -15,7 +15,7 @@
     "fs-extra": "^7.0.1",
     "line-by-line": "^0.1.6",
     "node-cleanup": "^2.1.2",
-    "sscjs": "0.0.5",
+    "sscjs": "0.0.8",
     "steem-js-patched": "^1.0.0"
   },
   "devDependencies": {

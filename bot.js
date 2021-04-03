@@ -7,6 +7,7 @@ const config = require('./config');
 
 
 const { account, bigWithdrawalsAmount } = config;
+const apiVerificationsNeeded = parseInt(config.apiVerificationsNeeded, 10);
 const activeKey = dhive.PrivateKey.from(process.env.ACTIVE_KEY);
 const steemNodes = new Queue();
 const sscNodes = new Queue();
@@ -41,6 +42,8 @@ const tableName = 'withdrawals';
 let hive = new dhive.Client(getSteemNode(), { timeout: queryTimeout });
 let ssc = new SSC(getSSCNode(), queryTimeout);
 
+const wait = milliseconds => new Promise(res => setTimeout(() => res(), milliseconds));
+
 const buildTransferOp = (to, amount, memo) => ['transfer',
   {
     from: account,
@@ -70,6 +73,70 @@ const buildTranferTx = (tx) => {
   };
 
   return buildTransferOp(recipient, `${quantity} ${type}`, JSON.stringify(memo));
+};
+
+const isTrxVerified = async (txId) => {
+  const id = txId.split('-fee')[0];
+  console.log(`verifying: ${txId}`);
+
+  const txInfo = await ssc.getTransactionInfo(id);
+  if (txInfo) {
+    const blockNum = txInfo.blockNumber;
+    console.log(`${txId}: found in block ${blockNum}`);
+
+    let confirms = 0;
+    let nodeList = [];
+    let round = null;
+    let roundHash = null;
+    let witness = null;
+    let signingKey = null;
+    let roundSignature = null;
+    while (confirms < apiVerificationsNeeded) {
+      let nextNode = '';
+      try {
+        nextNode = getSSCNode();
+        if (nodeList.includes(nextNode)) {
+          continue; // need to make sure we query different nodes each time
+        }
+        ssc = new SSC(nextNode, queryTimeout);
+        let blockInfo = await ssc.getBlockInfo(blockNum);
+
+        if (!blockInfo.round || !blockInfo.witness || blockInfo.witness.length === 0
+          || !blockInfo.roundHash || blockInfo.roundHash.length === 0
+          || !blockInfo.signingKey || blockInfo.signingKey.length === 0
+          || !blockInfo.roundSignature || blockInfo.roundSignature.length === 0) {
+          console.log(`${txId}: not verified yet; skipping for now`);
+          await wait(timeout);
+          return false;
+	}
+
+        if (nodeList.length === 0) {
+          round = blockInfo.round;
+          roundHash = blockInfo.roundHash;
+          witness = blockInfo.witness;
+          signingKey = blockInfo.signingKey;
+          roundSignature = blockInfo.roundSignature;
+        } else if (blockInfo.round !== round || blockInfo.roundHash !== roundHash
+          || blockInfo.witness !== witness || blockInfo.signingKey !== signingKey
+          || blockInfo.roundSignature !== roundSignature) {
+	  console.log(`${txId}: verification mismatch on ${nextNode}, num confirms: ${confirms}, checked nodes: [${nodeList}]`);
+          await wait(timeout);
+          return false;
+        }
+
+        nodeList.push(nextNode);
+        confirms += 1;
+        console.log(`${txId}: verified by ${nextNode} (confirms: ${confirms} of ${apiVerificationsNeeded})`);
+      } catch (error) {
+        console.log(error);
+      }
+      await wait(timeout);
+    }
+    console.log(`${txId}: verified by ${confirms} different nodes`);
+    return true;
+  }
+
+  return false;
 };
 
 // transfer the Steem to the accounts according to the parameters we retrieved from the contract
@@ -134,7 +201,8 @@ const getPendingWithdrawals = async () => {
     const res = await ssc.find(contractName, tableName, { }, maxNumberPendingWithdrawals);
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
-      if (parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
+      const isSafeTrx = await isTrxVerified(element.id);
+      if (isSafeTrx && parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
         pendingWithdrawals.push(element);
         break;
       }
