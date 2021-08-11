@@ -33,8 +33,8 @@ const getSSCNode = () => {
 let pendingWithdrawals = [];
 const bigPendingWithdrawalsIDs = new Queue(1000);
 const maxNumberPendingWithdrawals = 10;
-const timeout = 6000;
-const queryTimeout = 60000;
+const timeout = 500;
+const queryTimeout = 3000;
 const contractName = 'hivepegged';
 const contractAction = 'removeWithdrawal';
 const tableName = 'withdrawals';
