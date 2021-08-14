@@ -82,7 +82,7 @@ const buildTranferTx = (tx) => {
 
 const isTrxOfInterest = (txId) => {
   let isFirstTestPassed = false;
-  if ((isFeeHandler && txId.indexOf('fee') >= 0) || (!isFeeHandler && txId.indexOf('fee') < 0) {
+  if ((isFeeHandler && txId.indexOf('fee') >= 0) || (!isFeeHandler && txId.indexOf('fee') < 0)) {
     isFirstTestPassed = true;
   }
   return isFirstTestPassed;
