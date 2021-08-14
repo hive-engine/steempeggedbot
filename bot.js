@@ -7,12 +7,17 @@ const config = require('./config');
 
 
 const { account, bigWithdrawalsAmount } = config;
+const isFeeHandler = parseInt(config.handleFees, 10) === 1 ? true : false;
 const apiVerificationsNeeded = parseInt(config.apiVerificationsNeeded, 10);
 const activeKey = dhive.PrivateKey.from(process.env.ACTIVE_KEY);
 const steemNodes = new Queue();
 const sscNodes = new Queue();
 config.steemNodes.forEach(node => steemNodes.push(node));
 config.sscNodes.forEach(node => sscNodes.push(node));
+
+if (isFeeHandler) {
+  console.log('Configured to process fee transactions');
+}
 
 const getSteemNode = () => {
   const node = steemNodes.pop();
@@ -74,6 +79,14 @@ const buildTranferTx = (tx) => {
 
   return buildTransferOp(recipient, `${quantity} ${type}`, JSON.stringify(memo));
 };
+
+const isTrxOfInterest = (txId) => {
+  let isFirstTestPassed = false;
+  if ((isFeeHandler && txId.indexOf('fee') >= 0) || (!isFeeHandler && txId.indexOf('fee') < 0) {
+    isFirstTestPassed = true;
+  }
+  return isFirstTestPassed;
+}
 
 const isTrxVerified = async (txId) => {
   const id = txId.split('-fee')[0];
@@ -201,10 +214,12 @@ const getPendingWithdrawals = async () => {
     const res = await ssc.find(contractName, tableName, { }, maxNumberPendingWithdrawals);
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
-      const isSafeTrx = await isTrxVerified(element.id);
-      if (isSafeTrx && parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
-        pendingWithdrawals.push(element);
-        break;
+      if (isTrxOfInterest(element.id)) {
+        const isSafeTrx = await isTrxVerified(element.id);
+        if (isSafeTrx && parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
+          pendingWithdrawals.push(element);
+          break;
+        }
       }
     }
 
