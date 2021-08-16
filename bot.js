@@ -7,6 +7,7 @@ const config = require('./config');
 
 
 const { account, bigWithdrawalsAmount } = config;
+const maxCacheSize = parseInt(config.trxCacheSize, 10);
 const isFeeHandler = parseInt(config.handleFees, 10) === 1 ? true : false;
 const apiVerificationsNeeded = parseInt(config.apiVerificationsNeeded, 10);
 const activeKey = dhive.PrivateKey.from(process.env.ACTIVE_KEY);
@@ -36,6 +37,8 @@ const getSSCNode = () => {
 };
 
 let pendingWithdrawals = [];
+let trxList = [];
+let trxListIndex = 0;
 const bigPendingWithdrawalsIDs = new Queue(1000);
 const maxNumberPendingWithdrawals = 10;
 const timeout = 500;
@@ -80,13 +83,30 @@ const buildTranferTx = (tx) => {
   return buildTransferOp(recipient, `${quantity} ${type}`, JSON.stringify(memo));
 };
 
+const addTrxToCache = (txId) => {
+  if (trxList.length < maxCacheSize) {
+    trxList.push(txId);
+  } else {
+    trxList[trxListIndex] = txId;
+    trxListIndex += 1;
+    if (trxListIndex >= maxCacheSize) {
+      trxListIndex = 0;
+    }
+  }
+  console.log(`added ${txId} to transaction cache; new cache size is ${trxList.length}`);
+}
+
+const isTrxProcessed = (txId) => {
+  return (trxList.indexOf(txId) >= 0);
+};
+
 const isTrxOfInterest = (txId) => {
   let isFirstTestPassed = false;
   if ((isFeeHandler && txId.indexOf('fee') >= 0) || (!isFeeHandler && txId.indexOf('fee') < 0)) {
     isFirstTestPassed = true;
   }
   return isFirstTestPassed;
-}
+};
 
 const isTrxVerified = async (txId) => {
   const id = txId.split('-fee')[0];
@@ -168,8 +188,11 @@ const transferAssets = async () => {
 
 // transfer the pending withdrawals according to what we retrieved from the smart contract
 const processPendingWithdrawals = async () => {
-  // generate Steem transfers and send the funds out
+  // generate Hive transfers and send the funds out
   await transferAssets();
+
+  // record that these transfers have been processed
+  pendingWithdrawals.forEach(el => addTrxToCache(el.id));
 
   // check status
   checkWithdrawalsStatus(); // eslint-disable-line no-use-before-define
@@ -215,11 +238,14 @@ const getPendingWithdrawals = async () => {
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
       if (isTrxOfInterest(element.id)) {
-        const isSafeTrx = await isTrxVerified(element.id);
-        if (isSafeTrx && parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
-          pendingWithdrawals.push(element);
-          break;
-        }
+        const isProcessed = isTrxProcessed(element.id);
+        if (!isProcessed) {
+          const isSafeTrx = await isTrxVerified(element.id);
+          if (isSafeTrx && parseFloat(element.quantity) < parseFloat(config.bigWithdrawalsAmount)) {
+            pendingWithdrawals.push(element);
+            break;
+          }
+	}
       }
     }
 
