@@ -10,6 +10,8 @@ const blacklist = require('./blacklist.json');
 const { account, bigWithdrawalsAmount } = config;
 const maxCacheSize = parseInt(config.trxCacheSize, 10);
 const isFeeHandler = parseInt(config.handleFees, 10) === 1 ? true : false;
+const handleRemainder = parseInt(config.handleRemainder, 10);
+const mod = parseInt(config.mod, 10);
 const apiVerificationsNeeded = parseInt(config.apiVerificationsNeeded, 10);
 const activeKey = dhive.PrivateKey.from(process.env.ACTIVE_KEY);
 const steemNodes = new Queue();
@@ -113,12 +115,16 @@ const isTrxProcessed = (txId) => {
   return (trxList.indexOf(txId) >= 0);
 };
 
-const isTrxOfInterest = (txId) => {
-  let isFirstTestPassed = false;
+const isTrxOfInterest = (record) => {
+  let isTestPassed = false;
+  const txId = record.id;
   if ((isFeeHandler && txId.indexOf('fee') >= 0) || (!isFeeHandler && txId.indexOf('fee') < 0)) {
-    isFirstTestPassed = true;
+    const remainder = record['_id'] % mod;
+    if (remainder === handleRemainder) {
+      isTestPassed = true;
+    }
   }
-  return isFirstTestPassed;
+  return isTestPassed;
 };
 
 const isTrxVerified = async (txId) => {
@@ -254,7 +260,7 @@ const getPendingWithdrawals = async () => {
     let shouldDisableNode = false;
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
-      if (isTrxOfInterest(element.id)) {
+      if (isTrxOfInterest(element)) {
         const isProcessed = isTrxProcessed(element.id);
         if (!isProcessed) {
           const isSafeTrx = await isTrxVerified(element.id);
