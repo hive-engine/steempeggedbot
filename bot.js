@@ -1,10 +1,11 @@
 require('dotenv').config();
+const fs = require('fs');
 const nodeCleanup = require('node-cleanup');
 const SSC = require('sscjs');
 const dhive = require('@hiveio/dhive');
 const { Queue } = require('./libs/Queue');
 const config = require('./config');
-
+const blacklist = require('./blacklist.json');
 
 const { account, bigWithdrawalsAmount } = config;
 const maxCacheSize = parseInt(config.trxCacheSize, 10);
@@ -15,6 +16,8 @@ const steemNodes = new Queue();
 const sscNodes = new Queue();
 config.steemNodes.forEach(node => steemNodes.push(node));
 config.sscNodes.forEach(node => sscNodes.push(node));
+
+let currentNode = null;
 
 if (isFeeHandler) {
   console.log('Configured to process fee transactions');
@@ -29,14 +32,24 @@ const getSteemNode = () => {
 };
 
 const getSSCNode = () => {
-  const node = sscNodes.pop();
-  sscNodes.push(node);
+  currentNode = sscNodes.pop();
+  while (blacklist.includes(currentNode)) {
+    console.log('HE node is blacklisted, disabling:', currentNode); // eslint-disable-line no-console
+    currentNode = sscNodes.pop();
+    if (!currentNode) {
+      // TODO: handle this more gracefully and add staff alerting
+      console.log('No HE nodes available; quitting');
+      process.exit(1);
+    }
+  }
+  sscNodes.push(currentNode);
 
-  console.log('Using SSC node:', node); // eslint-disable-line no-console
-  return node;
+  console.log('Using HE node:', currentNode); // eslint-disable-line no-console
+  return currentNode;
 };
 
 let pendingWithdrawals = [];
+let staleMap = new Map();
 let trxList = [];
 let trxListIndex = 0;
 const bigPendingWithdrawalsIDs = new Queue(1000);
@@ -235,6 +248,10 @@ const getPendingWithdrawals = async () => {
   pendingWithdrawals = [];
   try {
     const res = await ssc.find(contractName, tableName, { }, maxNumberPendingWithdrawals);
+    let pauseTime = timeout;
+    let theNode = currentNode;
+    let isMarkedStale = false;
+    let shouldDisableNode = false;
     for (let index = 0; index < res.length; index += 1) {
       const element = res[index];
       if (isTrxOfInterest(element.id)) {
@@ -245,12 +262,31 @@ const getPendingWithdrawals = async () => {
             pendingWithdrawals.push(element);
             break;
           }
-	}
+	} else if (!isMarkedStale) {
+          isMarkedStale = true;
+          pauseTime = timeout * 8;
+          let numTimesStale = 0;
+          if (staleMap.has(currentNode)) {
+            numTimesStale = staleMap.get(currentNode);
+          }
+          numTimesStale += 1;
+          staleMap.set(currentNode, numTimesStale);
+          console.log(`HE node ${currentNode} marked stale (strike ${numTimesStale}); trx ${element.id} already processed`); // eslint-disable-line no-console
+          if (numTimesStale >= 2) {
+            shouldDisableNode = true;
+          }
+        }
       }
     }
 
+    if (shouldDisableNode) {
+      blacklist.push(theNode);
+      fs.writeFileSync('blacklist.json', JSON.stringify(blacklist, null, 4));
+      ssc = new SSC(getSSCNode(), queryTimeout);
+    }
+
     if (pendingWithdrawals.length <= 0) {
-      setTimeout(() => getPendingWithdrawals(), timeout);
+      setTimeout(() => getPendingWithdrawals(), pauseTime);
     } else {
       processPendingWithdrawals();
     }
