@@ -6,6 +6,7 @@ const dhive = require('@hiveio/dhive');
 const { Queue } = require('./libs/Queue');
 const config = require('./config');
 const blacklist = require('./blacklist.json');
+const trxCache = require('./trxcache.json');
 
 const { account, bigWithdrawalsAmount } = config;
 const maxCacheSize = parseInt(config.trxCacheSize, 10);
@@ -20,6 +21,7 @@ config.steemNodes.forEach(node => steemNodes.push(node));
 config.sscNodes.forEach(node => sscNodes.push(node));
 
 let currentNode = null;
+let exitSignal = null;
 
 if (isFeeHandler) {
   console.log('Configured to process fee transactions');
@@ -41,7 +43,12 @@ const getSSCNode = () => {
     if (!currentNode) {
       // TODO: handle this more gracefully and add staff alerting
       console.log('No HE nodes available; quitting');
-      process.exit(1);
+      fs.writeFileSync('trxcache.json', JSON.stringify(trxCache, null, 4));
+      if (exitSignal) {
+        process.kill(process.pid, exitSignal);
+      } else {
+        process.exit(1);
+      }
     }
   }
   sscNodes.push(currentNode);
@@ -52,10 +59,11 @@ const getSSCNode = () => {
 
 let pendingWithdrawals = [];
 let staleMap = new Map();
-let trxList = [];
-let trxListIndex = 0;
+let trxCount = 0;
+let stopping = false;
+let processing = true;
 const bigPendingWithdrawalsIDs = new Queue(1000);
-const maxNumberPendingWithdrawals = 10;
+const maxNumberPendingWithdrawals = 50;
 const timeout = 500;
 const queryTimeout = 3000;
 const contractName = 'hivepegged';
@@ -99,20 +107,22 @@ const buildTranferTx = (tx) => {
 };
 
 const addTrxToCache = (txId) => {
-  if (trxList.length < maxCacheSize) {
-    trxList.push(txId);
+  if (trxCache.trxList.length < maxCacheSize) {
+    trxCache.trxList.push(txId);
   } else {
-    trxList[trxListIndex] = txId;
-    trxListIndex += 1;
-    if (trxListIndex >= maxCacheSize) {
-      trxListIndex = 0;
+    trxCache.trxList[trxCache.trxListIndex] = txId;
+    trxCache.trxListIndex += 1;
+    if (trxCache.trxListIndex >= maxCacheSize) {
+      trxCache.trxListIndex = 0;
     }
   }
-  console.log(`added ${txId} to transaction cache; new cache size is ${trxList.length}`);
+  trxCount += 1;
+  console.log(`added ${txId} to transaction cache; current cache size is ${trxCache.trxList.length}`);
+  console.log(`transactions since last restart: ${trxCount}`);
 }
 
 const isTrxProcessed = (txId) => {
-  return (trxList.indexOf(txId) >= 0);
+  return (trxCache.trxList.indexOf(txId) >= 0);
 };
 
 const isTrxOfInterest = (record) => {
@@ -259,6 +269,9 @@ const getPendingWithdrawals = async () => {
     let isMarkedStale = false;
     let shouldDisableNode = false;
     for (let index = 0; index < res.length; index += 1) {
+      if (stopping) {
+        break;
+      }
       const element = res[index];
       if (isTrxOfInterest(element)) {
         const isProcessed = isTrxProcessed(element.id);
@@ -291,10 +304,15 @@ const getPendingWithdrawals = async () => {
       ssc = new SSC(getSSCNode(), queryTimeout);
     }
 
-    if (pendingWithdrawals.length <= 0) {
-      setTimeout(() => getPendingWithdrawals(), pauseTime);
+    if (!stopping) {
+      if (pendingWithdrawals.length <= 0) {
+        setTimeout(() => getPendingWithdrawals(), pauseTime);
+      } else {
+        processPendingWithdrawals();
+      }
     } else {
-      processPendingWithdrawals();
+      processing = false;
+      console.log('processing stopped');
     }
   } catch (error) {
     console.log(error);
@@ -349,7 +367,34 @@ getPendingWithdrawals();
 // start polling the BIG pending withdrawals
 // getBigPendingWithdrawals();
 
+const stopBot = (isFirstCall, isLastCall) => {
+  stopping = true;
+
+  if (isLastCall) {
+    process.kill(process.pid, exitSignal);
+    return;
+  }
+
+  if (processing || isFirstCall) {
+    console.log('waiting for processing to stop...');
+    setTimeout(() => stopBot(), 3000);
+    return;
+  }
+
+  console.log('saving transaction cache...');
+  fs.writeFileSync('trxcache.json', JSON.stringify(trxCache, null, 4));
+
+  console.log('app shutdown');
+  setTimeout(() => stopBot(false, true), 1000);
+}
+
 // graceful app closing
-nodeCleanup((exitCode, signal) => { // eslint-disable-line no-unused-vars
-  console.log('closing app'); // eslint-disable-line no-console
+nodeCleanup((exitCode, signal) => {
+  console.log('closing app...');
+  if (signal) {
+    exitSignal = signal;
+    stopBot(true);
+    nodeCleanup.uninstall();
+    return false;
+  }
 });
